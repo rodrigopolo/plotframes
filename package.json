@@ -27,6 +27,7 @@
   "homepage": "https://github.com/rodrigopolo/plotframes#readme",
   "dependencies": {
     "dashdash": "1.10.x",
+    "single-line-log": "^1.0.0",
     "split": "1.0.x",
     "temp": "0.8.x"
   },

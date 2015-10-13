@@ -1,8 +1,11 @@
 #!/usr/bin/env node
-var child = require('child_process');
-var dashdash = require('dashdash');
-var temp = require('temp');
-var split = require("split");
+var child = require('child_process'),
+	dashdash = require('dashdash'),
+	temp = require('temp'),
+	split = require("split"),
+	log = require('single-line-log').stderr,
+	isWin = /^win/.test(process.platform),
+	defterminal = isWin ? 'windows' : 'x11';
 
 var options = [
 	{
@@ -29,9 +32,9 @@ var options = [
 	}, {
 		names: ['terminal', 't'],
 		type: 'string',
-		help: 'Set the name of the terminal used by gnuplot. By default it is "x11". Must be used in conjunction with the output option. Check the gnuplot manual for the valid values.',
+		help: 'Set the name of the terminal used by gnuplot. By default it is "'+defterminal+'". Must be used in conjunction with the output option. Check the gnuplot manual for the valid values.',
 		helpArg: 'png',
-		default: 'x11'
+		default: defterminal
 	}
 ];
 
@@ -69,21 +72,10 @@ temp.track();
 var clnl = false;
 function cutelog(str, nl){
 	if(nl){
-		if(process.stdin.isTTY){
-			str = ''+str;
-			str = nl?str+'\r':str;
-			process.stderr.write(str);
-			clnl = true;
-		}
+		log(str);
 	}else{
-		if(clnl){
-			if(process.stdin.isTTY){
-				process.stdout.clearLine();  // clear current text
-				process.stdout.cursorTo(0);  // move cursor to beginning of line
-				clnl = false;
-			}
-		}
-		process.stdout.write(str+'\n');
+		log.clear();
+		log(str);
 	}
 }
 
@@ -133,6 +125,11 @@ function getDuration(input, cb){
 	process.on('exit', function() {
 		cli.kill();
 	});
+
+	cli.on('error', function() {
+		console.log('Error running FFprobe, check if it is installed correctly and if it is included in the system environment path.');
+		process.exit(1);
+	});
 }
 
 // Get frame bitrate
@@ -140,7 +137,7 @@ function getBitrate(input, time, cb){
 	var frame_count = 0;
 	var streams = [];
 	var r;
-	var r_frame = /(?:media_type\=(\w+)\n)(?:stream_index\=(\w+)\n)(?:pkt_pts_time\=(\d*.?\d*)\n)(?:pkt_size\=(\d+)\n)(?:pict_type\=(\w+))?/;
+	var r_frame = /(?:media_type\=(\w+)\r?\n)(?:stream_index\=(\w+)\r?\n)(?:pkt_pts_time\=(\d*.?\d*)\r?\n)(?:pkt_size\=(\d+)\r?\n)(?:pict_type\=(\w+))?/;
 
 	var cli = child.spawn(
 		'ffprobe', [
@@ -152,7 +149,7 @@ function getBitrate(input, time, cb){
 		],[]
 	);
 
-	cli.stdout.pipe(split(/\[\/FRAME\]\n/)).on('data', function (data){
+	cli.stdout.pipe(split(/\[\/FRAME\]\r?\n/)).on('data', function (data){
 		if(r = r_frame.exec(data)){
 			frame_count++;
 			r[4] = (r[4]*8)/1000;
@@ -179,6 +176,11 @@ function getBitrate(input, time, cb){
 	process.on('exit', function() {
 		cli.kill();
 	});
+
+	cli.on('error', function() {
+		console.log('Error running FFprobe, check if it is installed correctly and if it is included in the system environment path.');
+		process.exit(1);
+	});
 }
 
 // Get file duration
@@ -201,7 +203,7 @@ function createPlot(streams, cb){
 	for(var k in cm){
 		if(streams[k]){
 			streams[k].end();
-			scr += sep+'"'+streams[k].path+'" title "'+k+' frames" with impulses linecolor rgb "'+cm[k]+'"';
+			scr += sep+'"'+(streams[k].path).replace(/\\/g,'\\\\')+'" title "'+k+' frames" with impulses linecolor rgb "'+cm[k]+'"';
 			sep = ', ';
 		}
 	}
@@ -233,6 +235,11 @@ function createPlot(streams, cb){
 	process.on('exit', function() {
 		cli.kill();
 	});
+
+	cli.on('error', function() {
+		console.log('Error running gnuplot, check if it is installed correctly and if it is included in the system environment path.');
+		process.exit(1);
+	});
 }
 
 // Run
@@ -242,6 +249,4 @@ getDuration(opts.input, function(time){
 		});
 	});
 });
-
-
 
