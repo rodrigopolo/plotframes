@@ -249,5 +249,3 @@ getDuration(opts.input, function(time){
 		});
 	});
 });
-
-	
