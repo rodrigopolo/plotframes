@@ -1,11 +1,11 @@
 {
   "name": "plotframes",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A Node.js frame plotter inspired by FFmpeg plotframes",
   "main": "cli.js",
   "preferGlobal": true,
   "bin": {
-    "plotframes": "./cli.js"
+    "plotframes": "cli.js"
   },
   "repository": {
     "type": "git",
