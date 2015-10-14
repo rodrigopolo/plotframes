@@ -315,7 +315,7 @@ function createPlot(data, cb){
 	gnuplot.write(scr);
 	gnuplot.end();
 
-	console.log('\nRunnig gnuplot now.');
+	console.error('\nRunnig gnuplot now.');
 
 	var cli = child.spawn(
 		'gnuplot', [
