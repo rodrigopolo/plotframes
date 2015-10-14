@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+
+/*! plotframes | (c) 2015 RodrigoPolo.com | MIT License | https://github.com/rodrigopolo/plotframes/blob/master/LICENSE */
+
 var child = require('child_process'),
 	path = require('path'),
 	dashdash = require('dashdash'),
@@ -8,6 +11,7 @@ var child = require('child_process'),
 	isWin = /^win/.test(process.platform),
 	defterminal = isWin ? 'windows' : 'x11';
 
+// CLI option
 var options = [
 	{
 		names: ['help', 'h'],
@@ -43,8 +47,10 @@ var options = [
 	}
 ];
 
+// Parse user input
 var parser = dashdash.createParser({options: options});
 
+// Display help on console
 function showHelp(code){
 	var help = parser.help({includeEnv: true}).trimRight();
 	console.error('Usage: plotframes [OPTIONS]\n'+ 'options:\n'+ help);
@@ -74,6 +80,7 @@ if (!opts.input) {
 // Cleanup stream files on exit
 temp.track();
 
+// Single line output
 var clnl = false;
 function cutelog(str, nl){
 	if(nl){
@@ -220,6 +227,7 @@ function getBitrate(input, details, cb){
 			frame_count++;		
 			kbps_count += frame_zbits;
 
+			// Get the frame bitrate
 			frame_bitrate = frame_zbits * details.frame_rate;
 
 			if(opts.frames){
@@ -279,7 +287,7 @@ function getBitrate(input, details, cb){
 	});
 }
 
-// Get file duration
+// Create the plot files
 function createPlot(data, cb){
 
 	var cm = {
@@ -287,8 +295,8 @@ function createPlot(data, cb){
 		I: 'red',
 		B: 'blue',
 		A: 'blue'
-	};
-	var sep='';
+	},
+	sep='';
 
 	var scr='set title "Frames Bitrates for \\"'+path.basename(opts.input)+':'+opts.stream+'\\" "\n';
 		if(opts.frames){
@@ -301,6 +309,7 @@ function createPlot(data, cb){
 	if(opts.output){
 		scr += 'set output "'+opts.output+'"\n';
 	}
+
 	scr += 'plot';
 
 	for(var k in cm){

@@ -88,18 +88,38 @@ sudo apt-get install gnuplot-x11
 
 Or do all at once
 ```
-curl -sL https://deb.nodesource.com/setup | sudo bash -
 sudo ppa-purge ppa:mc3man/trusty-media
 sudo add-apt-repository ppa:mc3man/trusty-media
-sudo apt-get update
+curl -sL https://deb.nodesource.com/setup | sudo bash -
 sudo apt-get install ffmpeg gnuplot-x11 nodejs
 ```
 
-After that you can install `plotframes`, if it gives you a permision error, run `sudo` command before:
+After that you can install `plotframes`:
 ```
-sudo npm install plotframes
+sudo npm install plotframes -g
 ```
 
+#### Problems installing global packages on OS X or Ubuntu?
+
+Ubuntu fix:
+```
+npm config set prefix ~/.npm
+echo 'export PATH=$HOME/.npm/bin:$PATH' >> ~/.bashrc 
+. ~/.bashrc
+```
+
+OS X fix:
+```
+npm config set prefix ~/.npm
+echo 'export PATH=$HOME/.npm/bin:$PATH' >> ~/.bashrc 
+echo . ~/.bashrc >> ~/.bash_profile
+. ~/.bashrc
+```
+
+### Donations
+Did you find this useful? ***Consider donating***. Your contribution will help cover the costs of developing, distributing and supporting this project, not to mention the great relief it would bring my bank account, seriously, donate, it will make me very :smiley:  
+
+<a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&amp;hosted_button_id=U7B2YPB82R47U"><img src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" alt="Donate"></a>
 
 ## License
 
