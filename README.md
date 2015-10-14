@@ -2,7 +2,8 @@ plotframes
 ===========
 A Node.js CLI frame plotter inspired on [FFmpeg plotframes](https://github.com/FFmpeg/FFmpeg/blob/master/tools/plotframes) but 350x faster!
 
-![plot](http://i.imgur.com/i0iIg8D.png "plot")
+![Frame Based](http://i.imgur.com/M4gT0eX.png "Frame Based")
+![Time Based](http://i.imgur.com/J3l0Y7h.png "Time Based")
 
 
 Requirements:
@@ -25,18 +26,20 @@ options:
                                     file passed to the ffprobe command. If not
                                     specified it is the first argument passed to
                                     the script.
-    -s v, --stream=v                Specify stream. The value must be a string
+    -s 0, --stream=0                Specify stream. The value must be a string
                                     containing a stream specifier. Default value
-                                    is "v".
+                                    is "0".
     -o FILE.png, --output=FILE.png  Set the name of the output used by gnuplot.
                                     If not specified no output is created. Must
                                     be used in conjunction with the terminal
                                     option.
     -t png, --terminal=png          Set the name of the terminal used by
-                                    gnuplot. By default it is "x11". Must be
+                                    gnuplot. By default it is "windows". Must be
                                     used in conjunction with the output option.
                                     Check the gnuplot manual for the valid
                                     values.
+    -f, --frames                    Create a plot based on frame number instead
+                                    of frame time.
 ```
 
 >**WARNING:** This is **NOT** a node.js module for inclusion in other Node.js scripts, it is just a CLI for use in the terminal/console, maybe in the future I'll see to integrate it somehow.

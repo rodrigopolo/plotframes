@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 var child = require('child_process'),
+	path = require('path'),
 	dashdash = require('dashdash'),
 	temp = require('temp'),
 	split = require("split"),
@@ -21,9 +22,9 @@ var options = [
 	}, {
 		names: ['stream', 's'],
 		type: 'string',
-		help: 'Specify stream. The value must be a string containing a stream specifier. Default value is "v".',
-		helpArg: 'v',
-		default: 'v'
+		help: 'Specify stream. The value must be a string containing a stream specifier. Default value is "0".',
+		helpArg: '0',
+		default: '0'
 	}, {
 		names: ['output', 'o'],
 		type: 'string',
@@ -35,6 +36,10 @@ var options = [
 		help: 'Set the name of the terminal used by gnuplot. By default it is "'+defterminal+'". Must be used in conjunction with the output option. Check the gnuplot manual for the valid values.',
 		helpArg: 'png',
 		default: defterminal
+	}, {
+		names: ['frames', 'f'],
+		type: 'bool',
+		help: 'Create a plot based on frame number instead of frame time.'
 	}
 ];
 
@@ -66,7 +71,7 @@ if (!opts.input) {
 	}
 }
 
-// Automatically track and cleanup files at exit
+// Cleanup stream files on exit
 temp.track();
 
 var clnl = false;
@@ -79,13 +84,14 @@ function cutelog(str, nl){
 	}
 }
 
-
+// Pad number
 function pad(num, size) {
 	var str = num + "";
 	while (str.length < size) str = "0" + str;
 	return str;
 }
 
+// Seconds to time format
 function toHHMMSS(n) {
 	var sep = ':',
 		n = parseFloat(n),
@@ -97,28 +103,67 @@ function toHHMMSS(n) {
 	return pad(hh,2)+sep+pad(mm,2)+sep+pad(ss,2)+'.'+pad(sss,3);
 }
 
-// Get file duration
-function getDuration(input, cb){
-	var r_duration = /Duration: ((\d{2}):(\d{2}):(\d{2}).(\d{2})), /;
-	var r;
+// Get average in array
+function getAvg(arr) {
+	return arr.reduce(function (p, c) {return p + c;}) / arr.length;
+}
+
+// Bits into human readable units
+function bandWidth(bits) {
+	bits = bits* 1000;
+	var unit = 1000;
+	if (bits < unit) return (bits % 1 === 0 ? bits : bits.toFixed(2)) + "B";
+	var exp =  parseInt(Math.log(bits) / Math.log(unit));
+	var pre = "KMGTPE"[exp-1] + 'bps';
+	var n = bits / Math.pow(unit, exp);
+	return (n % 1 === 0 ? n : n.toFixed(2))+pre;
+}
+
+
+// Get file Details
+function getDetails(input, cb){
+
+	var rd,
+		rf,
+		frame_rate,
+		duration,
+		seconds,
+		r_frame_rate = /avg_frame_rate\=(\d+)\/(\d+)/,
+		r_duration = /Duration: ((\d{2}):(\d{2}):(\d{2}).(\d{2})), /;
+
 	var cli = child.spawn(
 		'ffprobe', [
+			'-show_entries',
+			'stream',
+			'-select_streams',
+			opts.stream,
 			input
 		],[]
 	);
 
-	cli.stderr.on('data', function (data) {
-		if(r = r_duration.exec(data)){	
-			cb({
-				duration: r[1],
-				seconds: ((((r[2]*60)+r[3])*60)+parseInt(r[4]))+parseFloat(r[5]/100)
-			});
+	cli.stdout.pipe(split()).on('data', function (data) {
+		if(rf = r_frame_rate.exec(data)){
+			frame_rate = (rf[1]/rf[2]) || 1;
+		}
+	});
+
+	cli.stderr.pipe(split()).on('data', function (data) {
+		if(rd = r_duration.exec(data)){
+			duration = rd[1];
+			seconds  = ((((rd[2]*60)+rd[3])*60)+parseInt(rd[4]))+parseFloat(rd[5]/100);
 		}
 	});
 
 	cli.on('close', function (code) {
 		if (code !== 0) {
-			cutelog('Error trying to get the file duration.',false);
+			cutelog('Error trying to get the file details.',false);
+		}
+		if(frame_rate && duration){
+			cb({
+				frame_rate: frame_rate,
+				duration: duration,
+				seconds: seconds
+			});
 		}
 	});
 
@@ -127,18 +172,24 @@ function getDuration(input, cb){
 	});
 
 	cli.on('error', function() {
-		console.log('Error running FFprobe, check if it is installed correctly and if it is included in the system environment path.');
+		cutelog('Error running FFprobe, check if it is installed correctly and if it is included in the system environment path.',false);
 		process.exit(1);
 	});
 }
 
 // Get frame bitrate
-function getBitrate(input, time, cb){
+function getBitrate(input, details, cb){
 	var frame_count = 0,
 		kbps_count = 0,
 		peak = 0,
 		min = 0,
 		start= true,
+		frame_bitrate,
+		frame_zbits,
+		frame_time,
+		frame_type,
+		time_sec,
+		times = [],
 		streams = [],
 		r,
 		r_frame = /(?:media_type\=(\w+)\r?\n)(?:stream_index\=(\w+)\r?\n)(?:pkt_pts_time\=(\d*.?\d*)\r?\n)(?:pkt_size\=(\d+)\r?\n)(?:pict_type\=(\w+))?/;
@@ -154,23 +205,39 @@ function getBitrate(input, time, cb){
 	);
 
 	cli.stdout.pipe(split(/\[\/FRAME\]\r?\n/)).on('data', function (data){
+
 		if(r = r_frame.exec(data)){
-			r[4] = (r[4]*8)/1000;
-			
+
+			// Cleaning the data
+			frame_zbits = (r[4]*8)/1000;
+			frame_time  = parseFloat(r[3]);
+			frame_type  = r[5]?r[5]:'A';
+
+			// Create stream if not exists
+			if(!streams[frame_type]){streams[frame_type] = temp.createWriteStream();}
+
+			// Counters
 			frame_count++;		
-			kbps_count += r[4];
+			kbps_count += frame_zbits;
 
-			if(start){min = r[4]; start=null;}
-			peak = peak < r[4] ? r[4] : peak;
-			min  = min > r[4] ? r[4] : min;
-			
-			r[5] = r[5]?r[5]:'A';
-			if(!streams[r[5]]){streams[r[5]] = temp.createWriteStream();}
-			
-			r[3] = parseFloat(r[3]);
+			frame_bitrate = frame_zbits * details.frame_rate;
 
-			streams[r[5]].write(frame_count+' '+r[4]+'\n');
-			cutelog('Analyzing '+toHHMMSS(r[3])+' / '+time.duration+' '+((r[3]/time.seconds)*100).toFixed(2)+'%',true);
+			if(opts.frames){
+				if(start){min = frame_bitrate; start=null;}
+				peak = peak < frame_bitrate ? frame_bitrate : peak;
+				min  = min > frame_bitrate ? frame_bitrate : min;
+				streams[frame_type].write(frame_count+' '+frame_bitrate+'\n');
+			}else{
+				time_sec = parseInt(frame_time);
+				if(times[time_sec]){
+					times[time_sec]+=frame_zbits;
+				}else{
+					times[time_sec] = frame_zbits;
+				}
+				streams[frame_type].write(frame_time+' '+frame_bitrate+'\n');
+			}
+
+			cutelog('Analyzing '+toHHMMSS(frame_time)+' / '+details.duration+' '+((frame_time/details.seconds)*100).toFixed(2)+'%',true);
 		}
 	});
 
@@ -178,14 +245,28 @@ function getBitrate(input, time, cb){
 		if (code !== 0) {
 			cutelog('Error trying to get the file bitrate.',false);
 		}
-		cutelog('Analysis complete.',false);
-		cb({
-			streams: streams,
-			avg: kbps_count/frame_count,
-			peak: peak,
-			min: min
-		});
 
+		cutelog('Analysis complete.',false);
+
+		if(opts.frames){
+			cb({
+				streams: streams,
+				avg: kbps_count/details.seconds,
+				peak: peak,
+				min: min,
+				frames: frame_count,
+				seconds: details.seconds
+			});
+		}else{
+			cb({
+				streams: streams,
+				avg: getAvg(times),
+				peak: Math.max.apply(Math, times),
+				min: Math.min.apply(Math, times),
+				frames: frame_count,
+				seconds: details.seconds
+			});
+		}
 	});
 
 	process.on('exit', function() {
@@ -193,7 +274,7 @@ function getBitrate(input, time, cb){
 	});
 
 	cli.on('error', function() {
-		console.log('Error running FFprobe, check if it is installed correctly and if it is included in the system environment path.');
+		cutelog('Error running FFprobe, check if it is installed correctly and if it is included in the system environment path.',false);
 		process.exit(1);
 	});
 }
@@ -209,7 +290,14 @@ function createPlot(data, cb){
 	};
 	var sep='';
 
-	var scr='set title "Frames Sizes in Kbits"\nset xlabel "Average: '+parseInt(data.avg)+', Peak: '+parseInt(data.peak)+', Min: '+parseInt(data.min)+'."\nset ylabel "Kbits"\nset grid\nset terminal "'+opts.terminal+'"\n';
+	var scr='set title "Frames Bitrates for \\"'+path.basename(opts.input)+':'+opts.stream+'\\" "\n';
+		if(opts.frames){
+			scr+='set xlabel "Avg Bitrate: '+bandWidth(data.avg)+'. '+data.frames+' Frames; Peak: '+bandWidth(data.peak)+' Min: '+bandWidth(data.min)+'."\n';
+		}else{
+			scr+='set xlabel " Avg Bitrate: '+bandWidth(data.avg)+'. '+parseInt(data.seconds)+' Seconds; Max: '+bandWidth(data.peak)+' Min: '+bandWidth(data.min)+'."\n';
+		}
+		scr+='set ylabel "Frames Kbps"\nset grid\nset terminal "'+opts.terminal+'"\n';
+
 	if(opts.output){
 		scr += 'set output "'+opts.output+'"\n';
 	}
@@ -227,7 +315,6 @@ function createPlot(data, cb){
 	gnuplot.write(scr);
 	gnuplot.end();
 
-	// Run gnuplot
 	var cli = child.spawn(
 		'gnuplot', [
 			'--persist',
@@ -252,16 +339,15 @@ function createPlot(data, cb){
 	});
 
 	cli.on('error', function() {
-		console.log('Error running gnuplot, check if it is installed correctly and if it is included in the system environment path.');
+		cutelog('Error running gnuplot, check if it is installed correctly and if it is included in the system environment path.',false);
 		process.exit(1);
 	});
 }
 
 // Run
-getDuration(opts.input, function(time){
-	getBitrate(opts.input, time, function(data){
+getDetails(opts.input, function(details){
+	getBitrate(opts.input, details, function(data){
 		createPlot(data, function(){
 		});
 	});
 });
-
