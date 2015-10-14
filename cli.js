@@ -134,10 +134,14 @@ function getDuration(input, cb){
 
 // Get frame bitrate
 function getBitrate(input, time, cb){
-	var frame_count = 0;
-	var streams = [];
-	var r;
-	var r_frame = /(?:media_type\=(\w+)\r?\n)(?:stream_index\=(\w+)\r?\n)(?:pkt_pts_time\=(\d*.?\d*)\r?\n)(?:pkt_size\=(\d+)\r?\n)(?:pict_type\=(\w+))?/;
+	var frame_count = 0,
+		kbps_count = 0,
+		peak = 0,
+		min = 0,
+		start= true,
+		streams = [],
+		r,
+		r_frame = /(?:media_type\=(\w+)\r?\n)(?:stream_index\=(\w+)\r?\n)(?:pkt_pts_time\=(\d*.?\d*)\r?\n)(?:pkt_size\=(\d+)\r?\n)(?:pict_type\=(\w+))?/;
 
 	var cli = child.spawn(
 		'ffprobe', [
@@ -151,14 +155,20 @@ function getBitrate(input, time, cb){
 
 	cli.stdout.pipe(split(/\[\/FRAME\]\r?\n/)).on('data', function (data){
 		if(r = r_frame.exec(data)){
-			frame_count++;
 			r[4] = (r[4]*8)/1000;
-			r[3] = parseFloat(r[3]);
-			r[5] = r[5]?r[5]:'A';
+			
+			frame_count++;		
+			kbps_count += r[4];
 
-			if(!streams[r[5]]){		
-				streams[r[5]] = temp.createWriteStream();
-			}
+			if(start){min = r[4]; start=null;}
+			peak = peak < r[4] ? r[4] : peak;
+			min  = min > r[4] ? r[4] : min;
+			
+			r[5] = r[5]?r[5]:'A';
+			if(!streams[r[5]]){streams[r[5]] = temp.createWriteStream();}
+			
+			r[3] = parseFloat(r[3]);
+
 			streams[r[5]].write(frame_count+' '+r[4]+'\n');
 			cutelog('Analyzing '+toHHMMSS(r[3])+' / '+time.duration+' '+((r[3]/time.seconds)*100).toFixed(2)+'%',true);
 		}
@@ -169,7 +179,12 @@ function getBitrate(input, time, cb){
 			cutelog('Error trying to get the file bitrate.',false);
 		}
 		cutelog('Analysis complete.',false);
-		cb(streams);
+		cb({
+			streams: streams,
+			avg: kbps_count/frame_count,
+			peak: peak,
+			min: min
+		});
 
 	});
 
@@ -184,7 +199,7 @@ function getBitrate(input, time, cb){
 }
 
 // Get file duration
-function createPlot(streams, cb){
+function createPlot(data, cb){
 
 	var cm = {
 		P: 'green',
@@ -194,16 +209,16 @@ function createPlot(streams, cb){
 	};
 	var sep='';
 
-	var scr='set title "Frames Sizes"\nset xlabel "Frames"\nset ylabel "Kbits"\nset grid\nset terminal "'+opts.terminal+'"\n';
+	var scr='set title "Frames Sizes in Kbits"\nset xlabel "Average: '+parseInt(data.avg)+', Peak: '+parseInt(data.peak)+', Min: '+parseInt(data.min)+'."\nset ylabel "Kbits"\nset grid\nset terminal "'+opts.terminal+'"\n';
 	if(opts.output){
 		scr += 'set output "'+opts.output+'"\n';
 	}
 	scr += 'plot';
 
 	for(var k in cm){
-		if(streams[k]){
-			streams[k].end();
-			scr += sep+'"'+(streams[k].path).replace(/\\/g,'\\\\')+'" title "'+k+' frames" with impulses linecolor rgb "'+cm[k]+'"';
+		if(data.streams[k]){
+			data.streams[k].end();
+			scr += sep+'"'+(data.streams[k].path).replace(/\\/g,'\\\\')+'" title "'+k+' frames" with impulses linecolor rgb "'+cm[k]+'"';
 			sep = ', ';
 		}
 	}
@@ -244,8 +259,8 @@ function createPlot(streams, cb){
 
 // Run
 getDuration(opts.input, function(time){
-	getBitrate(opts.input, time, function(streams){
-		createPlot(streams, function(){
+	getBitrate(opts.input, time, function(data){
+		createPlot(data, function(){
 		});
 	});
 });
