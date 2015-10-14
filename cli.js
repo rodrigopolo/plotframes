@@ -315,6 +315,8 @@ function createPlot(data, cb){
 	gnuplot.write(scr);
 	gnuplot.end();
 
+	console.log('\nRunnig gnuplot now.');
+
 	var cli = child.spawn(
 		'gnuplot', [
 			'--persist',
@@ -322,15 +324,13 @@ function createPlot(data, cb){
 		],[]
 	);
 
-	cli.stderr.on('data', function (data) {
-		cutelog(data,false);
-	});
+	cli.stdout.pipe(process.stdout);
+
+	cli.stderr.pipe(process.stderr);
 
 	cli.on('close', function (code) {
 		if (code !== 0) {
 			cutelog('Error trying to run gnuplot.',false);
-		}else{
-			cutelog('All tasks completed.',false);
 		}
 	});
 
