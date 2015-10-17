@@ -1,23 +1,21 @@
 plotframes
 ===========
-A Node.js CLI frame plotter inspired on [FFmpeg plotframes](https://github.com/FFmpeg/FFmpeg/blob/master/tools/plotframes) but 350x faster!
+A Node.js frame plotter inspired on [FFmpeg plotframes](https://github.com/FFmpeg/FFmpeg/blob/master/tools/plotframes) but 350x faster, now without using any temporal file and available as a node module!
 
-![Frame Based](http://i.imgur.com/M4gT0eX.png "Frame Based")
 ![Time Based](http://i.imgur.com/J3l0Y7h.png "Time Based")
 
-
-Requirements:
-* [gnuplot](http://www.gnuplot.info/)  
-* [FFmpeg >= 1.2 with the ffprobe command](https://www.ffmpeg.org/)
-
-
-Installation and running
+Installation and running as a CLI
 ```
 npm install plotframes -g
 plotframes input.mkv
 ```
 
-Usage
+Progress report to `stdout`:
+```
+Analyzing 00:02:00.000 / 00:01:00.00 50.00%
+```
+
+CLI options
 ```
 Usage: plotframes [OPTIONS]
 options:
@@ -26,9 +24,8 @@ options:
                                     file passed to the ffprobe command. If not
                                     specified it is the first argument passed to
                                     the script.
-    -s 0, --stream=0                Specify stream. The value must be a string
-                                    containing a stream specifier. Default value
-                                    is "0".
+    -s 0, --stream=0                Specify stream to plot, options are "all",
+                                    0, 1, 2... etc.
     -o FILE.png, --output=FILE.png  Set the name of the output used by gnuplot.
                                     If not specified no output is created. Must
                                     be used in conjunction with the terminal
@@ -40,32 +37,71 @@ options:
                                     values.
     -f, --frames                    Create a plot based on frame number instead
                                     of frame time.
+    -p, --print                     Print the gnuplot script into the stdout and
+                                    doesn't run gnuplot, ideal if you want to
+                                    edit/study the script.
 ```
 
->**WARNING:** This is **NOT** a node.js module for inclusion in other Node.js scripts, it is just a CLI for use in the terminal/console, maybe in the future I'll see to integrate it somehow.
+####Examples
 
-### Installing dependencies
+You can set many options to the `gnuplot` terminal argument:
+```
+plotframes -i input.m4v -o plot.png -t "pngcairo transparent enhanced font 'arial,10' fontscale 1.0 ; set zeroaxis;;"
+```
 
-#### Windows
+You can set `plotframes` to output the `gnuplot` script to `stdout` and then 
+pipe the result to `gnuplot`, this enables a world of possibilities for Linux 
+and Unix users:
+```
+plotframes -i input.mkv -s 0 -p | gnuplot -p
+```
+
+Or you can save the output redirecting the result:
+```
+plotframes -i input.mkv -p > script.txt
+```
+
+
+
+#### Requirements:
+`plotframes` for Node.js requires the following software to be installed and 
+available on the system `PATH` environment:
+* [gnuplot](http://www.gnuplot.info/).  
+* [FFmpeg](https://www.ffmpeg.org/)  >= 1.2 with the ffprobe command.
+
+#### Installing dependencies
+
+
+##### Windows
 1. [Download](https://nodejs.org) and install Node.js  
-2. [Download](http://ffmpeg.zeranoe.com/builds/) a FFmpeg build, uncompress it into a directory that is included in the system `%path%`.
+2. [Download](http://ffmpeg.zeranoe.com/builds/) a FFmpeg build, uncompress it 
+into a directory that is included in the system `%path%`.
 3. [Download](http://sourceforge.net/projects/gnuplot/) and install `gnpuplot`:  
-   There are [other downloads](http://sourceforge.net/projects/gnuplot/files/gnuplot/) in case you want to download a different version.  
-4. Open your `Command Promt` and run `npm install plotframes`.
+   There are [other downloads](http://sourceforge.net/projects/gnuplot/files/gnuplot/) 
+   in case you want to download a different version.  
+4. Make sure to add `ffmpeg` and `gnuplot` to your system environment `%PATH%`.
+5. Open your `Command Promt` and run `npm install plotframes -g`.
+6. Done, now you can run `plotframes` anywhere in your command prompt.
 
 
-#### OS X
-* Install Xcode from the App Store
-* Install [Homebrew](http://brew.sh)
+##### OS X
+* Install Xcode from the App Store.
+* Install [Homebrew](http://brew.sh) from your terminal.
 
-Then, using Hombrew intall FFmpeg, XQuartz (needed to render to x11) and gnuplot.
+Then, with Hombrew on your terminal intall FFmpeg, XQuartz (needed to render to 
+x11) and gnuplot.
 ```
 brew install ffmpeg
 brew install Caskroom/cask/xquartz
 brew install gnuplot --with-x11
 ```
 
-#### Ubuntu
+After that you can install `plotframes`:
+```
+sudo npm install plotframes -g
+```
+
+##### Ubuntu
 
 Install Node.js
 ```
@@ -116,12 +152,81 @@ echo . ~/.bashrc >> ~/.bash_profile
 . ~/.bashrc
 ```
 
-### Donations
+#### As a node module:
+
+You can load `plotframes` as a node module and get the frames data, get the 
+`gnuplot` script, customize colors, etc. here are two examples:
+
+
+Example 1 - Getting the data object
+```javascript
+var plotframes = require('plotframes'),
+  nlb = (/^win/.test(process.platform))?'\x1B[0G':'\n';
+
+var input_file = 'input.mkv';
+
+plotframes.getFrames(
+  input_file, 
+  function(err, res){
+    if(err){
+      console.log(err);
+    }else{
+      console.lod(JSON.stringify(res));
+    }
+  },
+  function(data){
+    var progress = (data.time/data.length)*100;
+    process.stderr.write(progress.toFixed(2)+'%'+nlb);
+  }
+);
+```
+
+Example 2 - Getting the plot data
+```javascript
+var plotframes = require('plotframes'),
+  nlb = (/^win/.test(process.platform))?'\x1B[0G':'\n';
+
+var input_file = 'input.mkv';
+
+plotframes.plotScript(input_file, 
+  function(err, res) {
+    if(err){
+      console.log(err);
+    }else{
+      console.log(res);
+    }   
+  },{
+    as_string: true,
+    frames: false,
+    stream: 0,
+    colors:{
+      I: '#00ffff',
+      P: '#ff00ff',
+      B: '#ffff00',
+      A: '#2dff00',
+      average: '#000000',
+      bitrate: '#00ff00',
+    },
+    styles:{
+      I: 'impulses',
+      P: 'lines',
+      B: 'lines',
+      A: 'lines',
+    },
+    progress: function(data){
+      var progress = (data.time/data.length)*100;
+      process.stderr.write(progress.toFixed(2)+'%'+nlb);
+    }
+  }
+);
+```
+
+#### Donations
 Did you find this useful? ***Consider donating***. Your contribution will help cover the costs of developing, distributing and supporting this project, not to mention the great relief it would bring my bank account, seriously, donate, it will make me very :smiley:  
 
 <a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&amp;hosted_button_id=U7B2YPB82R47U"><img src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" alt="Donate"></a>
 
-## License
+### License
 
 (The MIT License)
 
