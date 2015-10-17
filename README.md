@@ -2,7 +2,7 @@ plotframes
 ===========
 A Node.js frame plotter inspired on [FFmpeg plotframes](https://github.com/FFmpeg/FFmpeg/blob/master/tools/plotframes) but 350x faster, now without using any temporal file and available as a node module!
 
-![Time Based](http://i.imgur.com/J3l0Y7h.png "Time Based")
+![Bitrate Plot](http://i.imgur.com/FJh2ucz.gif "Bitrate Plot")
 
 Installation and running as a CLI
 ```
