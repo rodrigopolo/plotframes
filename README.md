@@ -46,7 +46,7 @@ options:
 
 You can set many options to the `gnuplot` terminal argument:
 ```
-plotframes -i input.m4v -o plot.png -t "pngcairo transparent enhanced font 'arial,10' fontscale 1.0 ; set zeroaxis;;"
+plotframes -i input.m4v -o plot.png -t "set terminal png transparent enhanced size 7000,800"
 ```
 
 You can set `plotframes` to output the `gnuplot` script to `stdout` and then 

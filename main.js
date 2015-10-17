@@ -104,21 +104,34 @@ function getDetails(input, cb){
 	});
 }
 
+
 // Get frame bitrate
 function getBitrate(input, details, progress, cb){
 	var 
+		// for regex
 		r_frame = /(?:media_type\=(\w+)\r?\n)(?:stream_index\=(\w+)\r?\n)(?:pkt_pts_time\=(\d*.?\d*)\r?\n)(?:pkt_size\=(\d+)\r?\n)(?:pict_type\=(\w+))?/,
 		r,
-		current_track,
+
+		// For frame arrays
 		frame_count 	= 0,
+		frame_stream,
 		frame_type,
+		frame_bitrate,
 		frame_size,
 		frame_time,
-		tracks 			= [],
-		fsizes 			= [],
-		times			= [],
-		bitrates 		= [],
-		fr2br 			= [];
+
+		// Frame Arrays
+		frames = {		
+			count: 		[],
+			stream: 	[],
+			type: 		[],
+			bitrate: 	[],
+			size: 		[],
+			time: 		[]
+		},
+
+		// For loop
+		frame_size;
 
 	// Run ffprobe
 	var cli = child.spawn(
@@ -134,65 +147,19 @@ function getBitrate(input, details, progress, cb){
 
 		if(r = r_frame.exec(data)){
 
-			current_track = r[2];
 			frame_count++;
+			frame_stream 	= parseInt(r[2]);
 			frame_type  	= r[5]?r[5]:'A';
 			frame_size 		= ((r[4]*8)/1000);
 			frame_bitrate	= frame_size * details.frame_rate;
 			frame_time  	= parseFloat(r[3]);
-			frame_sec  		= parseInt(frame_time);
 
-			// Create track if doesn't exists
-			if(!tracks[current_track]){
-				tracks[current_track] = {
-					type: r[1],
-					frames:{},
-					fpos:[],
-					bitrates:[],
-					fsizes:[],
-					times:[]
-				};
-			}
-
-			// Create frame type obj if doesn't exists
-			if(!tracks[current_track].frames[frame_type]){
-				tracks[current_track].frames[frame_type] = {
-					pos: 		[],
-					sec: 		[],
-					siz: 		[],
-					btr: 		[],
-				};
-			}
-
-			// Add frame type data
-			tracks[current_track].frames[frame_type].pos.push(frame_count);
-			tracks[current_track].frames[frame_type].sec.push(frame_time);
-			tracks[current_track].frames[frame_type].siz.push(frame_size);
-			tracks[current_track].frames[frame_type].btr.push(frame_bitrate);
-
-			// Add frame data
-			tracks[current_track].fpos.push(frame_count);
-			tracks[current_track].fsizes.push(frame_bitrate);
-			tracks[current_track].times.push(frame_time);
-
-			// Add bitrates per track
-			if(tracks[current_track].bitrates[frame_sec]){
-				tracks[current_track].bitrates[frame_sec] += frame_size;
-			}else{
-				tracks[current_track].bitrates[frame_sec] = frame_size;
-			}
-
-			// Add overall frame info
-			fsizes.push(frame_bitrate);
-			times.push(frame_time);
-
-			// Add overall bitrate data
-			if(bitrates[frame_sec]){
-				bitrates[frame_sec] += frame_size;
-			}else{
-				fr2br[frame_sec] 	= frame_count;
-				bitrates[frame_sec] = frame_size;
-			}
+			frames.count.push(frame_count);
+			frames.stream.push(frame_stream);
+			frames.type.push(frame_type);
+			frames.bitrate.push(frame_bitrate);
+			frames.size.push(frame_size);
+			frames.time.push(frame_time);
 
 			// Show progress
 			progress({
@@ -209,13 +176,7 @@ function getBitrate(input, details, progress, cb){
 		if (code !== 0) {
 			cb('Error trying to get the file bitrate.', null);
 		}
-		cb(null, {
-			tracks: 	tracks,
-			bitrates: 	bitrates,
-			fr2br: 		fr2br,
-			fsizes: 	fsizes,
-			times: 		times
-		});
+		cb(null, frames);
 
 	});
 
@@ -249,59 +210,114 @@ function getFrames(input, progress, cb){
 }
 
 // Generate gnuplot script
-function genScript(input, data, ops){
-	var gs = '';
+function genScript(input, frames, ops, cb){
+
+	// Functional
+	var all_streams = (ops.stream=='all');
+	var is_frames = ops.frames;
+	var selected_stream = parseInt(ops.stream);
 	var graphs = [];
-	var frame_types=[
-		'A',
+	var frame_types = [
 		'I',
 		'P',
 		'B',
+		'A',
 	];
 	var label_sep = '\\n';
 
-	var brtsrc = (ops.stream=='all')?data:data.tracks[ops.stream];
-	if(!brtsrc){
-		cb('That stream doesn\'t exists, it should be a number that exists.',null);
-		return false;
+	// for loops
+	var frame_sec;
+
+	// for storing
+	var bitrate = [];
+	var selected_stream_bitrate = [];
+	var selected_stream_bitrate_pos = [];
+	var selected_bitrate;
+	var gs = '';
+	var bitrate_max;
+	var bitrate_min;
+	var bitrate_avg;
+	var selected_frame_count = 0;
+	var selected_frame_types={};
+
+	var frame_start = frames.count[0];
+	var frame_end 	= frames.count[frames.count.length-1];
+	var time_start 	= frames.time[0];
+	var time_end 	= frames.time[frames.time.length-1];
+
+	// Create bitrate by sec for selected streams, count frames and save frame types
+	for (var i = 0; i < frames.size.length; i++) {
+		frame_sec = parseInt(frames.time[i]);
+		if(all_streams){
+			selected_frame_types[frames.type[i]] = []; // TODO: add stream number
+			selected_stream_bitrate.push(frames.size[i]);
+			selected_stream_bitrate_pos.push(frames.count[i]);
+			selected_frame_count++;
+			if(bitrate[frame_sec]){
+				bitrate[frame_sec] += frames.size[i];
+			}else{
+				bitrate[frame_sec] = frames.size[i];
+			}
+		}else{
+			if(frames.stream[i] == selected_stream){
+				selected_frame_types[frames.type[i]] = []; // TODO: add stream number
+				selected_stream_bitrate.push(frames.size[i]);
+				selected_stream_bitrate_pos.push(frames.count[i]);
+				selected_frame_count++;
+				if(bitrate[frame_sec]){
+					bitrate[frame_sec] += frames.size[i];
+				}else{
+					bitrate[frame_sec] = frames.size[i];
+				}
+			}
+		}
+	};
+
+	selected_bitrate = (is_frames)?frames.bitrate:bitrate;
+
+	if(bitrate.length == 0){
+		cb('There is no data in the selected stream.', null);
 	}
-	var br_average = arrAvg(brtsrc.bitrates);
-	var fr_average = arrAvg(brtsrc.fsizes);
 
 	// Set font size
-	gs+='set key font ",10"\n'
+	gs+='set key font ",10"\n';
 
 	// Graph range
-	if(ops.frames){
-		gs+='set xrange [1:'+(brtsrc.fsizes.length-1)+']\n';
+	if(is_frames){
+		gs+='set xrange ['+frame_start+':'+frame_end+']\n';
 	}else{
-		gs+='set xrange [0:'+(brtsrc.bitrates.length)+']\n';
+		gs+='set xrange ['+time_start+':'+time_end+']\n';
 	}
 
 	// Title 
 	gs += 'set title "Frames Bitrates for \\"'+path.basename(input);
-	if(ops.stream=='all'){
+	if(all_streams){
 		gs += '\\""\n';
 	}else{
 		gs += ':'+ops.stream+'\\""\n';
 	}
 
+	// Measurement
+	bitrate_max = arrMax(selected_bitrate);
+	bitrate_min = arrMin(selected_bitrate);
+	bitrate_avg = arrAvg(selected_bitrate);
+
 	// Info label
 	gs+='set label "';
-	if(ops.frames){
-		gs+='Frames: '+(brtsrc.fsizes.length-1)+' of '+(data.fsizes.length-1)+label_sep;
+	if(is_frames){
+		gs+='Frames: '+selected_frame_count+' of '+frames.count[frames.count.length-1]+label_sep;
 	}else{
-		gs+='Seconds: '+(brtsrc.bitrates.length)+label_sep;
+		gs+='Seconds: '+frames.time[frames.time.length-1]+label_sep;
 	}
 	gs+=
-	 'Max: '+bandWidth(arrMax(brtsrc.bitrates))+label_sep
-	+'Min: '+bandWidth(arrMin(brtsrc.bitrates))+label_sep
-	+'Avg: '+bandWidth(br_average);
+	 'Max: '+bandWidth(bitrate_max)+label_sep
+	+'Min: '+bandWidth(bitrate_min)+label_sep
+	+'Avg: '+bandWidth(bitrate_avg);
 
 	gs+='" left at graph 0.005, graph .970 font ",10"\n';
 
 	// X Label
-	gs+='set xlabel "'+((ops.frames)?'Frames':'Seconds')+'" font ",10"\n';
+	gs+='set xlabel "'+((is_frames)?'Frames':'Seconds')+'" font ",10"\n';
 
 	// Y Label
 	gs+='set ylabel "Kbps" font ",10"\n';
@@ -318,128 +334,58 @@ function genScript(input, data, ops){
 	// Plotting
 	gs += 'plot \\\n';
 
-	// File streams graphs
-	if(ops.stream=='all'){
-		for (var i = 0; i < data.tracks.length; i++){
-			for (var j = 0; j < frame_types.length; j++){
-				if(data.tracks[i].frames[frame_types[j]]){
-					graphs.push('"-" title "'+frame_types[j]+'" with '+ops.styles[frame_types[j]]+' linecolor rgb "'+ops.colors[frame_types[j]]+'"')
-				}		
-			};
-		};
-	}else{
-		for (var j = 0; j < frame_types.length; j++){
-			if(data.tracks[ops.stream].frames[frame_types[j]]){
-				graphs.push('"-" title "'+frame_types[j]+'" with '+ops.styles[frame_types[j]]+' linecolor rgb "'+ops.colors[frame_types[j]]+'"')
-			}		
-		};
+
+	// Loop trough selected stream frames
+	for (var i = 0; i < frame_types.length; i++) {
+		if(selected_frame_types[frame_types[i]]){
+			graphs.push('"-" title "'+frame_types[i]+'" with '+ops.styles[frame_types[i]]+' linecolor rgb "'+ops.colors[frame_types[i]]+'"');
+		}
+	};
+
+	if(!is_frames){
+		// Average bitrate
+		graphs.push('"-" title "Average" with lines lc rgb "'+ops.colors.average+'" lt 1 lw .5');
+
+		// Bitrate
+		graphs.push('"-" smooth bezier title "Bitrate" with lines lc rgb "'+ops.colors.bitrate+'" lt 1 lw 1.5');
 	}
-
-	// Average bitrate
-	graphs.push('"-" title "Average" with lines lc rgb "'+ops.colors.average+'" lt 1 lw .5');
-
-	// Bitrate
-	graphs.push('"-" smooth bezier title "Bitrate" with lines lc rgb "'+ops.colors.bitrate+'" lt 1 lw 1.5');
 
 	// Add the graphs defs			
 	gs += graphs.join(', \\\n')+' \n';
 
-	// Graph data
-	if(ops.stream=='all'){
-		for (var i = 0; i < data.tracks.length; i++){
-			for (var j = 0; j < frame_types.length; j++){
-				if(data.tracks[i].frames[frame_types[j]]){
-					for (var k = 0; ; k++) {
-
-						if(ops.frames){
-							gs += data.tracks[i].frames[frame_types[j]]['pos'][k];
-						}else{
-							gs += data.tracks[i].frames[frame_types[j]]['sec'][k];
-						}
-
-						gs += ' '
-							+ data.tracks[i].frames[frame_types[j]]['btr'][k]
-							+'\n';
-
-						if(k == data.tracks[i].frames[frame_types[j]]['btr'].length-1){
-							gs += ('e\n');
-							break;
-						}
-					};
-				}		
-			};
-		};
-	}else{
-		for (var j = 0; j < frame_types.length; j++){
-			if(data.tracks[ops.stream].frames[frame_types[j]]){
-				for (var k = 0; ; k++) {
-
-					if(ops.frames){
-						gs += data.tracks[ops.stream].frames[frame_types[j]]['pos'][k];
-					}else{
-						gs += data.tracks[ops.stream].frames[frame_types[j]]['sec'][k];
-					}
-
-					gs += ' '
-						+ data.tracks[ops.stream].frames[frame_types[j]]['btr'][k]
-						+'\n';;
-
-					if(k == data.tracks[ops.stream].frames[frame_types[j]]['btr'].length-1){
-						gs += ('e\n');
-						break;
-					}
-				};
-			}		
-		};
-	}
-
-	// Bitrate average data
-	if(ops.stream=='all'){
-		if(ops.frames){
-			// frames all
-			gs += '1 '+ br_average+ '\n'
-			   + data.fsizes.length+ ' '+ br_average+ '\ne\n';
-		}else{
-			// bitrates all
-			gs += '0 ' + br_average + '\n' 
-			   + data.times[data.times.length-1] + ' ' + br_average + '\ne\n';
-		}
-	}else{
-		if(ops.frames){
-			// frames single
-			gs += ('1 '+ br_average+ '\n'
-			   + data.tracks[ops.stream].fsizes.length+ ' '+ br_average+ '\ne\n');
-		}else{
-			// bitrate single
-			gs += ('0 ' + br_average + '\n' 
-			   + data.tracks[ops.stream].times[data.tracks[ops.stream].times.length-1] + ' ' + br_average + '\ne\n');
-		}
-	}
-
-	// Bitrate data
-	if(ops.frames){
-		for (var i = 0; ; i++) {
-			
-			gs += (ops.stream=='all') ? (i+1) : brtsrc.fpos[i];
-
-			gs += ' '+brtsrc.fsizes[i]+'\n';
-
-			if(i ==  brtsrc.fsizes.length-1){
-				gs += ('e\n');
-				break;
+	// Add frames for selected streams
+	for (var i = 0; i < frames.bitrate.length; i++) {
+		if(selected_frame_types[frames.type[i]]){
+			if(is_frames){
+				selected_frame_types[frames.type[i]].push(frames.count[i]+' '+frames.bitrate[i]);
+			}else{
+				selected_frame_types[frames.type[i]].push(frames.time[i]+' '+frames.bitrate[i]);
 			}
-		};
-	}else{
-		for (var i = 0; ; i++) {
-			gs += (i+' '+brtsrc.bitrates[i]+'\n');
-			if(i ==  brtsrc.bitrates.length-1){
-				gs += ('e\n');
-				break;
-			}
-		};
+		}
+	};
+
+	// Loop trough selected stream frames
+	for (var i = 0; i < frame_types.length; i++) {
+		if(selected_frame_types[frame_types[i]]){
+			gs += selected_frame_types[frame_types[i]].join('\n')+'\ne\n';
+		}
+	};
+	
+	// Add average bitrate line
+	if(!is_frames){
+		gs += time_start+' '+bitrate_avg+'\n';
+		gs += time_end+' '+bitrate_avg+'\ne\n';
 	}
 
-	return gs;
+	// Add bitrate line
+	if(!is_frames){
+		for (var i = 0; i < bitrate.length; i++) {
+			gs += i+' '+bitrate[i]+'\n';
+		};
+		gs += 'e';
+	}
+
+	cb(null, gs);
 }
 
 // Parse the options, gen the script and call gnuplot via stdin
@@ -475,65 +421,65 @@ function plotScript(input, cb, op){
 	var script_str='';
 
 	getFrames(input, options.progress, function(err, data){
-
 		if(err){
 			cb(err, null);
 		}else{
-
 			// gnuplot script
-			var gs = genScript(input, data, options);
-			
+			genScript(input, data, options,function(err, gs){
 
-			if(options.as_string){
-				cb(null, gs);
-			}else{
-				// Run gnuplot 
-				var cli = child.spawn(
-					'gnuplot', [
-						'-p'
-					], {stdin: 'pipe'}
-				);
-
-				// Pipe streams
-				if(options.stdout){
-					cli.stdout.pipe(options.stdout);
-				}
-				if(options.stderr){
-					cli.stderr.pipe(options.stderr);
-				}
-
-				// Check if there is an error code, if not, run the callback with true message
-				cli.on('close', function (code) {
-					if (code !== 0) {
-						cb('Error trying to run gnuplot.', null);
+				if(err){
+					cb(err, null);
+				}else{
+					if(options.as_string){
+						cb(null, gs);
 					}else{
-						cb(null, true);
+						// Run gnuplot 
+						var cli = child.spawn(
+							'gnuplot', [
+								'-p'
+							], {stdin: 'pipe'}
+						);
+
+						// Pipe streams
+						if(options.stdout){
+							cli.stdout.pipe(options.stdout);
+						}
+						if(options.stderr){
+							cli.stderr.pipe(options.stderr);
+						}
+
+						// Check if there is an error code, if not, run the callback with true message
+						cli.on('close', function (code) {
+							if (code !== 0) {
+								cb('Error trying to run gnuplot.', null);
+							}else{
+								cb(null, true);
+							}
+						});
+
+						// If node script exits, kills the child
+						process.on('exit', function() {
+							cli.kill();
+						});
+
+						// On error running gnuplot
+						cli.on('error', function() {
+							cb('Error running gnuplot, check if it is installed correctly and if it is included in the system environment path.', null);
+						});
+
+						cli.stdin.setEncoding('utf-8');
+
+						var script = new stream.Readable();
+						script._read = function noop() {};
+
+						script.pipe(cli.stdin);
+
+						script.push(gs);
+						script.push(null);
 					}
-				});
-
-				// If node script exits, kills the child
-				process.on('exit', function() {
-					cli.kill();
-				});
-
-				// On error running gnuplot
-				cli.on('error', function() {
-					cb('Error running gnuplot, check if it is installed correctly and if it is included in the system environment path.', null);
-				});
-
-				cli.stdin.setEncoding('utf-8');
-
-				var script = new stream.Readable();
-				script._read = function noop() {};
-
-				script.pipe(cli.stdin);
-
-				script.push(gs);
-				script.push(null);
-			}
-
+				}
+			});
 		}
-
 	}, options);
 }
 

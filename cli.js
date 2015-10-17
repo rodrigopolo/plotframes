@@ -117,6 +117,7 @@ plotframes.plotScript(opts.input,
 			process.exit(1);
 		}else{
 			if(opts.print){
+				log.clear();
 				console.log(res);
 			}else{
 				cutelog('All tasks done!',false);
