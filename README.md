@@ -224,7 +224,7 @@ plotframes.plotScript(input_file,
 #### Donations
 Did you find this useful? ***Consider donating***. Your contribution will help cover the costs of developing, distributing and supporting this project, not to mention the great relief it would bring my bank account, seriously, donate, it will make me very :smiley:  
 
-<a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&amp;hosted_button_id=U7B2YPB82R47U"><img src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" alt="Donate"></a>
+[PayPal](http://paypal.me/rodrigopolo)
 
 ### License
 
