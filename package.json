@@ -22,7 +22,7 @@
   "homepage": "https://github.com/rodrigopolo/plotframes#readme",
   "main": "main.js",
   "bin": {
-    "plotframes": "cli.js"
+    "plotframes": "bin/cli.js"
   },
   "preferGlobal": true,
   "bugs": {
@@ -30,8 +30,8 @@
   },
   "maintainers": [
     {
-    "name": "Rodrigo Polo",
-    "email": "rodrigo.polo@gmail.com"
+      "name": "Rodrigo Polo",
+      "email": "rodrigo.polo@gmail.com"
     }
   ],
   "dependencies": {
