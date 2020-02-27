@@ -2,8 +2,8 @@
 
 /*! plotframes | (c) 2015 RodrigoPolo.com | MIT License | https://github.com/rodrigopolo/plotframes/blob/master/LICENSE */
 
-var 
-	plotframes = require('./main'),
+var
+	plotframes = require('../main'),
 	dashdash = require('dashdash'),
 	log = require('single-line-log').stderr,
 	isWin = /^win/.test(process.platform),
@@ -103,14 +103,14 @@ if (opts.help) {
 
 if (!opts.input) {
 	if(opts._args[0]){
-		opts.input = opts._args[0]; 
+		opts.input = opts._args[0];
 	}else{
 		console.error('Error! No input defined.');
 		showHelp(1);
 	}
 }
 
-plotframes.plotScript(opts.input, 
+plotframes.plotScript(opts.input,
 	function(err, res) {
 		if (err) {
 			cutelog(err,false);
@@ -123,7 +123,7 @@ plotframes.plotScript(opts.input,
 				cutelog('All tasks done!',false);
 			}
 		}
-		
+
 	},{
 		progress: function(data){
 			cutelog('Analyzing '+toHHMMSS(data.time)+' / '+data.duration+' '+((data.time/data.length)*100).toFixed(2)+'%',true);
