@@ -1,5 +1,5 @@
-const sinon = require('sinon')
+const sinon = require('sinon');
 
 afterEach(() => {
   sinon.restore()
-})
+});

@@ -51,7 +51,7 @@
   },
   "scripts": {
     "test": "NODE_ENV=test  c8 --reporter=clover --reporter=lcov --reporter=text mocha --reporter spec ./test/*.test.js ./test/**/*.test.js",
-    "lint": "eslint  main.js bin/*.js ./test/**/*.test.js",
+    "lint": "eslint  ./main.js ./bin/*.js ./lib/*.js ./test/**/*.test.js",
     "posttest": "npm run lint && npm audit --production"
   }
 }
