@@ -2,7 +2,7 @@
 
 /*! plotframes | (c) 2015 RodrigoPolo.com | MIT License | https://github.com/rodrigopolo/plotframes/blob/master/LICENSE */
 
-let
+const
   plotframes = require('../main'),
   dashdash = require('dashdash'),
   log = require('single-line-log').stderr,
@@ -11,8 +11,14 @@ let
 
 
 // Single line output
-let clnl = false;
-function cutelog (str, nl){
+const clnl = false; // FIXME: unused -- remove?
+/**
+ * Print logs with or without clearing previous
+ * @param {string} str - the log string to print
+ * @param {boolean} nl - true if the line should be cleared before printing
+ * @returns {void}
+ */
+function cutelog (str, nl) {
   if(nl){
     log(str);
   }else{
@@ -21,25 +27,38 @@ function cutelog (str, nl){
   }
 }
 
-// Display help on console
+/**
+ * Display help on console, then exits
+ * @param {number} code - the exit code to exit with
+ * @returns {void}
+ */
 function showHelp (code){
-  let help = parser.help({includeEnv: true}).trimRight();
+  const help = parser.help({includeEnv: true}).trimRight();
   console.error('Usage: plotframes [OPTIONS]\n'+ 'options:\n'+ help);
   process.exit(code);
 }
 
 
-// Pad number
+/**
+ * Pad number
+ * @param {number} num - the number to zero-pad
+ * @param {number} size - the desired size of the padded number string
+ * @returns {string} - the number, left-padded with zeros to length size
+ */
 function pad (num, size) {
   let str = num + '';
   while (str.length < size) str = '0' + str;
   return str;
 }
 
-// Seconds to time format
+/**
+ * Seconds to time format
+ * @param {number} n - a string representing the number of seconds in floating point
+ * @returns {string} - the string in HH:MM:SS.SSS format
+ */
 function toHHMMSS (n) {
-  var sep = ':',
-    n = parseFloat(n),
+  n = parseFloat(n);
+  const sep = ':',
     sss = parseInt((n % 1)*1000),
     hh = parseInt(n / 3600);
   n %= 3600;
@@ -51,7 +70,7 @@ function toHHMMSS (n) {
 
 
 // User options parser
-var parser = dashdash.createParser({options: [
+const parser = dashdash.createParser({options: [
   {
     names: ['help', 'h'],
     type: 'bool',
@@ -90,8 +109,9 @@ var parser = dashdash.createParser({options: [
   }
 ]});
 
+let opts;
 try {
-  var opts = parser.parse(process.argv);
+  opts = parser.parse(process.argv);
 } catch (e) {
   console.error('Error! Unknown option.');
   showHelp(1);

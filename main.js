@@ -1,6 +1,6 @@
 /*! plotframes | (c) 2015 RodrigoPolo.com | MIT License | https://github.com/rodrigopolo/plotframes/blob/master/LICENSE */
 
-let 
+const
   fs = require('fs'),
   stream = require('stream'),
   child = require('child_process'),
@@ -11,45 +11,62 @@ let
   defterminal = isWin ? 'windows' : 'x11';
 
 
-// Average array prototype
+/**
+ * Average an array of numbers
+ * @param {Array<number>} arr - the array to compute an average over
+ * @returns {number} - the average value
+ */
 function arrAvg (arr){
   return arr.reduce(function (p, c) {return p + c;}) / arr.length;
 }
 
-// Max array prototype
+/**
+ * Maximum in an array of numbers
+ * @param {Array<number>} arr - the array to find the maximum in
+ * @returns {number} - the max value
+ */
 function arrMax (arr){
   return Math.max.apply(Math, arr);
 }
 
-// Min array prototype
+/**
+ * Minimum in an array of numbers
+ * @param {Array<number>} arr - the array to find the minimum in
+ * @returns {number} - the min value
+ */
 function arrMin (arr){
   return Math.min.apply(Math, arr);
 }
 
-// Bits into human readable units
+/**
+ * Bits into human readable units
+ * @param {number} bits - the number of bits
+ * @returns {string} - a human-readable number expression
+ */
 function bandWidth (bits) {
   bits = bits* 1000;
-  let unit = 1000;
+  const unit = 1000;
   if (bits < unit) return (bits % 1 === 0 ? bits : bits.toFixed(2)) + 'B';
-  let exp =  parseInt(Math.log(bits) / Math.log(unit));
-  let pre = 'KMGTPE'[exp-1] + 'bps';
-  let n = bits / Math.pow(unit, exp);
+  const exp =  parseInt(Math.log(bits) / Math.log(unit));
+  const pre = 'KMGTPE'[exp-1] + 'bps';
+  const n = bits / Math.pow(unit, exp);
   return (n % 1 === 0 ? n : n.toFixed(2))+pre;
 }
 
-// Get file Details
+/**
+ * Get file Details
+ * @param {string} input - the file path of the input file
+ * @param {function} cb - the callback to call when complete
+ * @returns {void}
+ */
 function getDetails (input, cb){
-  let 
-    rf,
+  let rf, rd, frame_rate, duration, seconds;
+  const
     r_frame_rate = /avg_frame_rate\=(\d+)\/(\d+)/,
-    frame_rate,
-    rd,
-    r_duration = /Duration: ((\d{2}):(\d{2}):(\d{2}).(\d{2})), /,
-    duration,
-    seconds;
+    r_duration = /Duration: ((\d{2}):(\d{2}):(\d{2}).(\d{2})), /;
 
   // Run ffprobe
-  let cli = child.spawn(
+  const cli = child.spawn(
     'ffprobe', [
       '-show_entries',
       'stream',
@@ -104,36 +121,40 @@ function getDetails (input, cb){
 }
 
 
-// Get frame bitrate
+/**
+ * Get frame bitrate
+ * @param {string} input - the file path of the input file
+ * @param {Object} details - file details (required keys: frame_rate, duration, seconds)
+ * @param {function} progress - a function to call to report progress
+ * @param {function} cb - a callback function to call on completion
+ * @returns {void}
+ */
 function getBitrate (input, details, progress, cb){
-  var 
-    // for regex
-    r_frame = /(?:media_type\=(\w+)\r?\n)(?:stream_index\=(\w+)\r?\n)(?:pkt_pts_time\=(\d*.?\d*)\r?\n)(?:pkt_size\=(\d+)\r?\n)(?:pict_type\=(\w+))?/,
-    r,
+  // for regex
+  const r_frame = /(?:media_type\=(\w+)\r?\n)(?:stream_index\=(\w+)\r?\n)(?:pkt_pts_time\=(\d*.?\d*)\r?\n)(?:pkt_size\=(\d+)\r?\n)(?:pict_type\=(\w+))?/;
 
+  let r,
     // For frame arrays
-    frame_count 	= 0,
+    frame_count = 0,
     frame_stream,
     frame_type,
     frame_bitrate,
     frame_size,
     frame_time,
-
     // Frame Arrays
-    frames = {		
-      count: 		[],
-      stream: 	[],
-      type: 		[],
-      bitrate: 	[],
-      size: 		[],
-      time: 		[]
-    },
-
+    frames = {
+      count: [],
+      stream: [],
+      type: [],
+      bitrate: [],
+      size: [],
+      time: []
+    };
     // For loop
-    frame_size;
+    // let frame_size; // FIXME: Already exists? l114 above.
 
   // Run ffprobe
-  let cli = child.spawn(
+  const cli = child.spawn(
     'ffprobe', [
       '-show_entries',
       'frame=stream_index,media_type,pict_type,pkt_size,pkt_pts_time',
@@ -186,7 +207,13 @@ function getBitrate (input, details, progress, cb){
   });
 }
 
-// Create an object containing all the frame data
+/**
+ * Create an object containing all the frame data
+ * @param {string} input - the file path of the input file
+ * @param {function} progress - a function to call to report progress
+ * @param {function} cb - a callback function to call on completion
+ * @returns {void}
+ */
 function getFrames (input, progress, cb){
   progress = progress || function (d){}
   getDetails(input, function (err, details){
@@ -204,43 +231,50 @@ function getFrames (input, progress, cb){
   });
 }
 
-// Generate gnuplot script
+/**
+ * Generate gnuplot script
+ * @param {string} input - the file path of the input file
+ * @param {Object} frames - an object with frames data
+ * @param {Object} ops - an object containing option values
+ * @param {function} cb - a callback function to call when complete
+ * @returns {void}
+ */
 function genScript (input, frames, ops, cb){
   // Functional
-  let all_streams = (ops.stream=='all');
-  let is_frames = ops.frames;
-  let selected_stream = parseInt(ops.stream);
-  let graphs = [];
-  let frame_types = [
+  const all_streams = (ops.stream=='all');
+  const is_frames = ops.frames;
+  const selected_stream = parseInt(ops.stream);
+  const graphs = [];
+  const frame_types = [
     'I',
     'P',
     'B',
     'A',
   ];
-  let label_sep = '\\n';
+  const label_sep = '\\n';
 
   // for loops
   let frame_sec;
 
   // for storing
-  let bitrate = [];
-  let selected_stream_bitrate = [];
-  let selected_stream_bitrate_pos = [];
+  const bitrate = [];
+  const selected_stream_bitrate = [];
+  const selected_stream_bitrate_pos = [];
   let selected_bitrate;
   let gs = '';
   let bitrate_max;
   let bitrate_min;
   let bitrate_avg;
   let selected_frame_count = 0;
-  let selected_frame_types={};
+  const selected_frame_types={};
 
-  let frame_start = frames.count[0];
-  let frame_end 	= frames.count[frames.count.length-1];
-  let time_start 	= frames.time[0];
-  let time_end 	= frames.time[frames.time.length-1];
+  const frame_start = frames.count[0];
+  const frame_end 	= frames.count[frames.count.length-1];
+  const time_start 	= frames.time[0];
+  const time_end 	= frames.time[frames.time.length-1];
 
   // Create bitrate by sec for selected streams, count frames and save frame types
-  for (var i = 0; i < frames.size.length; i++) {
+  for (let i = 0; i < frames.size.length; i++) {
     frame_sec = parseInt(frames.time[i]);
     if(all_streams){
       selected_frame_types[frames.type[i]] = []; // TODO: add stream number
@@ -283,7 +317,7 @@ function genScript (input, frames, ops, cb){
     gs+='set xrange ['+time_start+':'+time_end+']\n';
   }
 
-  // Title 
+  // Title
   gs += 'set title "Frames Bitrates for \\"'+path.basename(input);
   if(all_streams){
     gs += '\\""\n';
@@ -304,9 +338,9 @@ function genScript (input, frames, ops, cb){
     gs+='Seconds: '+frames.time[frames.time.length-1]+label_sep;
   }
   gs+=
-	 'Max: '+bandWidth(bitrate_max)+label_sep
-	+'Min: '+bandWidth(bitrate_min)+label_sep
-	+'Avg: '+bandWidth(bitrate_avg);
+    'Max: '+bandWidth(bitrate_max)+label_sep
+  + 'Min: '+bandWidth(bitrate_min)+label_sep
+  + 'Avg: '+bandWidth(bitrate_avg);
 
   gs+='" left at graph 0.005, graph .970 font ",10"\n';
 
@@ -330,7 +364,7 @@ function genScript (input, frames, ops, cb){
 
 
   // Loop trough selected stream frames
-  for (var i = 0; i < frame_types.length; i++) {
+  for (let i = 0; i < frame_types.length; i++) {
     if(selected_frame_types[frame_types[i]]){
       graphs.push('"-" title "'+frame_types[i]+'" with '+ops.styles[frame_types[i]]+' linecolor rgb "'+ops.colors[frame_types[i]]+'"');
     }
@@ -344,11 +378,11 @@ function genScript (input, frames, ops, cb){
     graphs.push('"-" smooth bezier title "Bitrate" with lines lc rgb "'+ops.colors.bitrate+'" lt 1 lw 1.5');
   }
 
-  // Add the graphs defs			
+  // Add the graphs defs
   gs += graphs.join(', \\\n')+' \n';
 
   // Add frames for selected streams
-  for (var i = 0; i < frames.bitrate.length; i++) {
+  for (let i = 0; i < frames.bitrate.length; i++) {
     if(selected_frame_types[frames.type[i]]){
       if(is_frames){
         selected_frame_types[frames.type[i]].push(frames.count[i]+' '+frames.bitrate[i]);
@@ -359,12 +393,12 @@ function genScript (input, frames, ops, cb){
   };
 
   // Loop trough selected stream frames
-  for (var i = 0; i < frame_types.length; i++) {
+  for (let i = 0; i < frame_types.length; i++) {
     if(selected_frame_types[frame_types[i]]){
       gs += selected_frame_types[frame_types[i]].join('\n')+'\ne\n';
     }
   };
-	
+
   // Add average bitrate line
   if(!is_frames){
     gs += time_start+' '+bitrate_avg+'\n';
@@ -373,7 +407,7 @@ function genScript (input, frames, ops, cb){
 
   // Add bitrate line
   if(!is_frames){
-    for (var i = 0; i < bitrate.length; i++) {
+    for (let i = 0; i < bitrate.length; i++) {
       gs += i+' '+bitrate[i]+'\n';
     };
     gs += 'e';
@@ -382,11 +416,17 @@ function genScript (input, frames, ops, cb){
   cb(null, gs);
 }
 
-// Parse the options, gen the script and call gnuplot via stdin
+/**
+ * Parse the options, gen the script and call gnuplot via stdin
+ * @param {string} input - the file path of the input file
+ * @param {function} cb - a callback function to call when complete
+ * @param {Object} op - runtime options
+ * @returns {void}
+ */
 function plotScript (input, cb, op){
-  let options = {
+  const options = {
     stream: 'all',
-    terminal: defterminal, 
+    terminal: defterminal,
     output: false,
     frames: false,
     colors:{
@@ -411,7 +451,7 @@ function plotScript (input, cb, op){
   }
 
   extend(options, op);
-  let script_str='';
+  let script_str=''; // FIXME: never used?
 
   getFrames(input, options.progress, function (err, data){
     if(err){
@@ -425,8 +465,8 @@ function plotScript (input, cb, op){
           if(options.as_string){
             cb(null, gs);
           }else{
-            // Run gnuplot 
-            let cli = child.spawn(
+            // Run gnuplot
+            const cli = child.spawn(
               'gnuplot', [
                 '-p'
               ], {stdin: 'pipe'}
@@ -461,8 +501,8 @@ function plotScript (input, cb, op){
 
             cli.stdin.setEncoding('utf-8');
 
-            let script = new stream.Readable();
-            script._read = function noop () {};
+            const script = new stream.Readable();
+            script._read = () => {};
 
             script.pipe(cli.stdin);
 
