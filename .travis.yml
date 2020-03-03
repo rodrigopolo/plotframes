@@ -7,10 +7,9 @@ jobs:
       node_js:
         - "lts/dubnium"
         - "lts/erbium"
-        - "lts/*"
         - "node"
     - stage: coverage
-      script: npm run coverage
+      script: npm test && npm run coverage
       node_js:
         - "lts/*"
     - stage: lint
