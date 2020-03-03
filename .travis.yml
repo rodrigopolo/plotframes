@@ -1,13 +1,13 @@
 language: node_js
+node_js:
+  - "lts/dubnium"
+  - "lts/erbium"
+  - "node"
 script: echo "Running tests against $(node -v)..."
 jobs:
   include:
     - stage: test
       script: npm test
-      node_js:
-        - "lts/dubnium"
-        - "lts/erbium"
-        - "node"
     - stage: coverage
       script: npm test && npm run coverage
       node_js:
