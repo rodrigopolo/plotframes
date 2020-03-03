@@ -4,3 +4,16 @@ node_js:
   - "lts/erbium"
   - "lts/*"
   - "node"
+
+script: echo "Running tests against $(node -v)..."
+
+jobs:
+  include:
+    - stage: test
+      script: npm test
+    - stage: coverage
+      script: npm run coverage
+    - stage: lint
+      script: npm run lint
+    - stage: audit
+      script: npm run audit
