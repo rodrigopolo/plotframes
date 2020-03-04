@@ -18,6 +18,6 @@ jobs:
       node_js:
         - "lts/*"
     - stage: audit
-      script: npm run audit
+      script: npm audit
       node_js:
         - "lts/*"
