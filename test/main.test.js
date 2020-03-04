@@ -1,10 +1,16 @@
 const chai = require('chai'),
   expect = chai.expect
 
+/*
 const {
+  bandWidth,
+  getDetails,
+  getBitrate,
   getFrames,
+  genScript,
   plotScript
 } = require('../main')
+ */
 
 describe('main', () => {
   describe('bandWidth', () => {

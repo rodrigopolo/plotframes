@@ -1,3 +1,15 @@
+const chai = require('chai'),
+  expect = chai.expect
+
+/*
+const {
+  cuteLog,
+  showHelp,
+  pad,
+  toHHMMSS
+} = require('../../bin/cli')
+ */
+
 describe('CLI', () => {
   describe('cuteLog', () => {
     it.skip('should have some tests');
