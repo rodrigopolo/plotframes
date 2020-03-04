@@ -54,6 +54,6 @@
   "scripts": {
     "test": "NODE_ENV=test c8 --reporter=clover --reporter=lcov --reporter=text mocha --reporter mocha-multi-reporters --reporter-options configFile=./test/.reporters-config.json ./test/*.test.js ./test/**/*.test.js",
     "coverage": "NODE_ENV=test cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js",
-    "lint": "eslint  ./main.js ./bin/*.js ./lib/*.js ./test/**/*.test.js"
+    "lint": "eslint  ./main.js ./bin/*.js ./test/**/*.test.js"
   }
 }
