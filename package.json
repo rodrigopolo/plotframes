@@ -22,7 +22,7 @@
   "homepage": "https://github.com/rodrigopolo/plotframes#readme",
   "main": "main.js",
   "bin": {
-    "plotframes": "cli.js"
+    "plotframes": "bin/cli.js"
   },
   "preferGlobal": true,
   "bugs": {
@@ -30,8 +30,8 @@
   },
   "maintainers": [
     {
-    "name": "Rodrigo Polo",
-    "email": "rodrigo.polo@gmail.com"
+      "name": "Rodrigo Polo",
+      "email": "rodrigo.polo@gmail.com"
     }
   ],
   "dependencies": {
@@ -40,5 +40,20 @@
     "single-line-log": "1.0.x",
     "split": "1.0.x",
     "temp": "0.8.x"
+  },
+  "devDependencies": {
+    "c8": "^7.1.0",
+    "chai": "^4.2.0",
+    "coveralls": "^3.0.9",
+    "eslint": "^6.8.0",
+    "mocha": "^7.1.0",
+    "mocha-junit-reporter": "^1.23.3",
+    "mocha-multi-reporters": "^1.1.7",
+    "sinon": "^9.0.0"
+  },
+  "scripts": {
+    "test": "NODE_ENV=test c8 --reporter=clover --reporter=lcov --reporter=text mocha --reporter mocha-multi-reporters --reporter-options configFile=./test/.reporters-config.json ./test/*.test.js ./test/**/*.test.js",
+    "coverage": "NODE_ENV=test cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js",
+    "lint": "eslint  ./main.js ./bin/*.js ./test/**/*.test.js"
   }
 }
