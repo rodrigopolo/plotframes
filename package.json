@@ -43,6 +43,7 @@
   },
   "devDependencies": {
     "c8": "^7.1.0",
+    "chai": "^4.2.0",
     "coveralls": "^3.0.9",
     "eslint": "^6.8.0",
     "mocha": "^7.1.0",
@@ -52,7 +53,7 @@
   },
   "scripts": {
     "test": "NODE_ENV=test c8 --reporter=clover --reporter=lcov --reporter=text mocha --reporter mocha-multi-reporters --reporter-options configFile=./test/.reporters-config.json ./test/*.test.js ./test/**/*.test.js",
-    "coverage": "NODE_ENV=test c8 --reporter=clover --reporter=lcov --reporter=text mocha --reporter mocha-multi-reporters --reporter-options configFile=./test/.reporters-config.json ./test/*.test.js ./test/**/*.test.js && cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js",
+    "coverage": "NODE_ENV=test cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js",
     "lint": "eslint  ./main.js ./bin/*.js ./lib/*.js ./test/**/*.test.js"
   }
 }
