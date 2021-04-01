@@ -418,6 +418,12 @@ function plotScript(input, cb, op){
 	}
 
 	extend(options, op);
+
+	// To prevent almost imposible Command Injection
+	if(options.terminal != 'windows' && options.terminal != 'x11'){
+		options.terminal = defterminal;
+	}
+
 	var script_str='';
 
 	getFrames(input, options.progress, function(err, data){
