@@ -55,7 +55,7 @@ function getDetails(input, cb){
 			'-show_entries',
 			'stream',
 			input
-		],[]
+		]
 	);
 
 	// Get frame rate from stdout
@@ -139,7 +139,7 @@ function getBitrate(input, details, progress, cb){
 			'-show_entries',
 			'frame=stream_index,media_type,pict_type,pkt_size,pkt_pts_time',
 			input
-		],[]
+		]
 	);
 
 	// Get frame data
